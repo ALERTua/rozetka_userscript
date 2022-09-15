@@ -19,6 +19,8 @@
 /* eslint-disable no-multi-spaces, no-return-assign */
 'use strict';
 
+const urlBase = "https://rozetka.alertua.duckdns.org";
+
 const createElement = (tagName, config = {}) => {
     const el = document.createElement(tagName);
     if (config.attrs) Object.entries(config.attrs).forEach(([attr, val]) => el.setAttribute(attr, val));
@@ -28,59 +30,101 @@ const createElement = (tagName, config = {}) => {
     return el;
 };
 
+const createChartDiv = (chartName) => {
+    return createElement(
+        'div',
+        {
+            props: {
+                className: chartName,
+                style: "width: 100%; height: 200px",
+            },
+            children: [
+                createElement('div', {
+                    props: {
+                        className: chartName.concat('-chart-container'),
+                        style: "position: relative; height: 200px;"
+                    },
+                    children: [
+                        createElement('canvas', {
+                            attrs: {
+                                id: chartName.concat('-canvas')
+                            },
+                            props: {
+                                style: "width: 100%; height: 200px"
+                            }
+
+                        })
+                    ]
+                })
+            ]
+        }
+    );
+};
+
 const createChart = (canvas, settings) => new Chart((typeof canvas === 'string' ? document.querySelector(canvas) : canvas).getContext('2d'), settings);
 
 const createSimpleBarChart = (selector, chartData) => {
-    const {data, label} = chartData;
-    let prices = data.map(({value}) => value);
-    let max_i = Math.max.apply(null, prices);
-    let min_i = Math.min.apply(null, prices);
+    let datasets = [];
+    let all_values = [];
+    let all_timedates = [];
+
+    chartData.forEach(function (input, index) {
+        const color = input.color;
+        const points = input.points;
+        //console.log("points: " + JSON.stringify(points));
+        all_timedates.push(...Object.keys(points));
+        all_values.push(...Object.values(points));
+
+        let dataset = {
+            label: input.field,
+            borderColor: color,
+            data: Object.values(points),
+            borderWidth: 3,
+            tension: 0.1,
+            lineTension: 0,
+            stepped: true,
+            fill: false,
+            pointHoverBorderColor: color,
+            pointHoverBackgroundColor: "rgba(80,80,80,1)",
+            pointHoverRadius: 3,
+            pointHoverBorderWidth: 3
+        }
+        datasets.push(dataset);
+    })
+    let timedates = all_timedates.filter((v, i, a) => a.indexOf(v) === i);
+    console.log("timedates: " + JSON.stringify(timedates));
+
+    let max_i = Math.max.apply(null, all_values);
+    let min_i = Math.min.apply(null, all_values);
+
     return createChart(selector, {
-        type: 'bar',
+        type: 'line',
         data: {
-            labels: data.map(({key}) => key),
-            datasets: [{
-                label: label,
-                borderColor: "#00DC4B",
-                data: data.map(({value}) => value),
-                // backgroundColor: data.map(({backgroundColor}) => backgroundColor),
-                // borderColor: data.map(({borderColor}) => borderColor),
-                borderWidth: 3,
-                tension: 0.0,
-                lineTension: 0,
-                stepped: true,
-                fill: false,
-                pointHoverBorderColor: "rgba(0,220,75,1)",
-                pointHoverBackgroundColor: "rgba(19,21,33,1)",
-                pointHoverRadius: 5,
-                pointHoverBorderWidth: 4
-                // borderColor: 'rgb(75, 192, 192)',
-            }]
+            labels: timedates,
+            datasets: datasets
         },
         options: {
-            interaction: {
-                mode: 'x'
-            },
             legend: {
-                //display: false
-                position: "chartArea",
-                align: "center",
-                title: {
-                    text: "price"
-                }
+                display: true,
+                position: "right",
+                align: "start",
+                fullSize: false,
+                // title: {
+                //     text: name
+                // }
             },
             scales: {
                 yAxes: [{
                     ticks: {
-                        min: Math.round(min_i / 1.2),
-                        max: Math.round(max_i * 1.2),
+                        min: Math.round(min_i / 1.1),
+                        max: Math.round(max_i * 1.1),
                         stepSize: Math.round(max_i / 2)
                     }
                 }
                 ],
                 xAxes: [{
                     gridLines: {
-                        display: !1
+                        display: false
                     },
                     ticks: {
                         maxRotation: 0,
@@ -91,21 +135,33 @@ const createSimpleBarChart = (selector, chartData) => {
             },
             elements: {
                 point: {
-                    radius: 3,
-                    borderWidth: 3,
+                    radius: 2,
+                    borderWidth: 0,
                     pointStyle: "circle"
                 },
             },
             hover: {
                 mode: "nearest",
-                intersect: !1
+                intersect: false
             },
-            aspectRatio: 3,
-            responsive: !0,
-            plugins: {
-                tooltip: {
-                    enabled: true
-                }
+            responsive: false,
+            tooltips: {
+                enabled: true,
+                mode: "nearest",
+                intersect: false,
+                position: "nearest",
+                bodyAlign: "center",
+                titleAlign: "center",
+                xAlign: "center",
+                yAlign: "center",
+                caretPadding: 0,
+                caretSize: 0,
+                displayColors: false,
+                borderWidth: 1,
+                backgroundColor: "#fff",
+                bodyFontColor: "rgba(0,0,0,0.87)",
+                titleFontColor: "rgba(0,0,0,0.87)",
+                borderColor: "rgba(0,0,0,0.4)",
             }
         }
     });
@@ -120,86 +176,82 @@ function get_id() {
     return iconElements.length > 0 && !!((expRecords = iconElements[0].innerText.match(/\d[0-9]*/)) && expRecords.length > 0) && expRecords[0];
 }
 
-$(document).ready(function () {
+function parse_response(response, id_) {
+{
+    // console.log("got response: " + response.response);
+    let json_data = JSON.parse(response.response);
+    // console.log("got response: " + json_data);
+    if (json_data.length === 0) {
+        console.log("rozetka_api: no data on " + id_);
+        return
+    }
+    let all_fields = Object.keys(json_data[0]);
+    // console.log("all_fields: " + all_fields);
+    const field_excludes = ['_time',];
+    const fields = all_fields.filter(function(e) { return !field_excludes.includes(e)})
+    // console.log("fields: " + fields);
 
+    let container_element = document.getElementsByClassName('product-about')[0].parentNode;
+    let before_element = document.getElementsByClassName('product-about')[1];
+    const rozetkaApiDiv = createChartDiv('rozetka_api_chart');
+    container_element.insertBefore(rozetkaApiDiv, before_element);
+
+    let chart_data = [];
+    let colors = [
+        'rgb(173,173,173)',
+        'rgb(176,85,85)',
+        'rgba(17,243,0,0.4)',
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+        'rgb(0, 0, 0)',
+    ];
+    fields.forEach(function (field, index) {
+        // let color = colors[Math.floor(Math.random()*colors.length)];
+        let color = colors.at(index);
+        let field_chart_data = {'field': field, 'color': color, 'points':{}};
+        json_data.forEach(function (obj, index) {
+            let _time = obj['_time'];
+            let date = new Date(_time);
+            let date_options = {year: 'numeric', month: 'short', day: 'numeric'};
+            let date_str = date.toLocaleDateString(undefined, options = date_options);
+            let time_options = { hour12: false, hour: '2-digit', minute: '2-digit'};
+            let time_str = date.toLocaleTimeString(undefined, options=time_options)
+            let value = obj[field];
+            let datetime_str = date_str + ' ' + time_str;
+            //console.log("point: datetime_str: " + datetime_str + ", value: " + value);
+            field_chart_data.points[datetime_str] = value
+        })
+        // console.log("field_chart_data: " + field_chart_data);
+        chart_data.push(field_chart_data)
+    })
+    //console.log("chart_data: " + JSON.stringify(chart_data));
+    const myChart = createSimpleBarChart('#rozetka_api_chart-canvas', chart_data);
+}
+}
+
+$(document).ready(function () {
     // let id_ = document.getElementsByClassName('g-id')[0].textContent;
     let id_ = get_id();
-    console.log("rozetka_api for " + id_);
-    GM_addStyle(`${GM_getResourceText('CHART_JS_CSS')}
-    .rozetka_api-chart-wrapper {
-      position: fixed;
-      width: 710px;
-      height: 236px;
-      background: rgba(255, 255, 255, 0.9);
-      border: thin solid grey;
+    if (id_ === false) {
+        return
     }
-  `);
+    console.log("rozetka_api for " + id_);
+//     GM_addStyle(`${GM_getResourceText('CHART_JS_CSS')}
+//     .rozetka_api-chart-wrapper {
+//       position: fixed;
+//       width: 710px;
+//       height: 236px;
+//       background: rgba(255, 255, 255, 0.9);
+//       border: thin solid grey;
+//     }
+//   `);
 
     GM_xmlhttpRequest({
         method: 'GET',
-        url: 'https://rozetka.alertua.duckdns.org/get/' + id_,
+        url: urlBase + '/get/' + id_,
         onload: function (response) {
-            // console.log("got response");
-            let json_data = JSON.parse(response.response);
-            let timestamps = [];
-            let prices = [];
-
-            for (const [key, value] of Object.entries(json_data)) {
-                console.log(key, value);
-                timestamps.push(key);
-                prices.push(value);
-            }
-            if (timestamps.length === 0) {
-                console.log("rozetka_api: no data on " + id_);
-                return
-            }
-            // console.log(id_ + " " + data);
-            // console.log("response parsed");
-            console.log("timestamps: " + timestamps);
-            console.log("prices: " + prices);
-
-            let product_trade = document.getElementsByClassName('product-trade')[0];
-            let rozetka_api_div = createElement('div', {
-                props: {
-                    className: 'rozetka_api',
-                    style: "width: 100%"
-                },
-                children: [
-                    createElement('div', {
-                        props: {
-                            className: 'rozetka_api-chart-container',
-                            style: "position: relative;"
-                        },
-                        children: [
-                            createElement('canvas', {
-                                attrs: {id: 'rozetka_api-canvas'}
-                            })
-                        ]
-                    })
-                ]
-            })
-            product_trade.appendChild(rozetka_api_div);
-
-            let chart_data = []
-            for (const [key, value] of Object.entries(json_data)) {
-                console.log("key: " + key);
-                let flt = parseFloat(key);
-                let date = new Date(flt);
-                let date_options = {year: 'numeric', month: 'short', day: 'numeric'};
-                let date_str = date.toLocaleDateString(undefined, options = date_options);
-                console.log("date_str: " + date_str);
-                chart_data.push({
-                    key: date_str,
-                    value: value
-                })
-            }
-
-            const chartData = {
-                label: 'Price',
-                data: chart_data
-            };
-
-            const myChart = createSimpleBarChart('#rozetka_api-canvas', chartData);
+            return parse_response(response, id_)
         }
     });
 });
