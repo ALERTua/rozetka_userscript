@@ -4,8 +4,7 @@
 // @description Rozetka API
 // @version 1
 // @match https://rozetka.com.ua/*
-// @match https://*.rozetka.com.ua/*"
-// @match https://bt.rozetka.com.ua/*
+// @match https://*.rozetka.com.ua/*
 // @require http://ajax.googleapis.com/ajax/libs/jquery/1.9.1/jquery.min.js
 // @require https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.js
 // @resource CHART_JS_CSS https://cdnjs.cloudflare.com/ajax/libs/Chart.js/2.9.4/Chart.min.css
