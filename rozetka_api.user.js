@@ -191,7 +191,7 @@ function parse_response(response, id_) {
     // console.log("fields: " + fields);
 
     let container_element = document.getElementsByClassName('product-about')[0].parentNode;
-    let before_element = document.getElementsByClassName('product-about')[1];
+    let before_element = document.getElementsByClassName('sort-blocks')[0];
     const rozetkaApiDiv = createChartDiv('rozetka_api_chart');
     container_element.insertBefore(rozetkaApiDiv, before_element);
 
