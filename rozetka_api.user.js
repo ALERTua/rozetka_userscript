@@ -11,14 +11,14 @@
 // @grant GM_xmlhttpRequest
 // @grant GM_addStyle
 // @grant GM_getResourceText
-// @connect rozetka.alertua.duckdns.org
+// @connect rozetka.alertua.pp.ua
 // ==/UserScript==
 
 /* global Chart */
 /* eslint-disable no-multi-spaces, no-return-assign */
 'use strict';
 
-const urlBase = "https://rozetka.alertua.duckdns.org";
+const urlBase = "https://rozetka.alertua.pp.ua";
 
 const createElement = (tagName, config = {}) => {
     const el = document.createElement(tagName);
